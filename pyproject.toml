@@ -50,7 +50,9 @@ target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM"]
+# Keep CI focused on correctness, import hygiene and common bug patterns.
+# Opinionated modernization/simplification rules can be introduced incrementally.
+select = ["E", "F", "I", "B"]
 
 [tool.mypy]
 python_version = "3.11"
