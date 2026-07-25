@@ -12,6 +12,7 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
@@ -25,6 +26,18 @@ jobs:
       - name: Lint
         run: ruff check .
       - name: Type check
-        run: mypy
+        shell: bash
+        run: |
+          set +e
+          mypy --show-error-codes 2>&1 | tee mypy-output.txt
+          status=${PIPESTATUS[0]}
+          exit "$status"
+      - name: Upload mypy diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mypy-python-${{ matrix.python-version }}
+          path: mypy-output.txt
+          if-no-files-found: warn
       - name: Test
         run: pytest --cov=industrial_ai_toolkit --cov-report=term-missing
