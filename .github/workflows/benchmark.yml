@@ -1,0 +1,61 @@
+name: Benchmark validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "benchmarks/**"
+      - "src/industrial_ai_toolkit/benchmark.py"
+      - "tests/test_benchmark.py"
+      - ".github/workflows/benchmark.yml"
+  pull_request:
+    paths:
+      - "benchmarks/**"
+      - "src/industrial_ai_toolkit/benchmark.py"
+      - "tests/test_benchmark.py"
+      - ".github/workflows/benchmark.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install project
+        run: python -m pip install -e ".[dev]"
+      - name: Run evaluator tests
+        run: pytest tests/test_benchmark.py
+      - name: Generate naive lower-bound responses
+        run: |
+          python benchmarks/v0.1/generate_baselines.py \
+            --policy naive \
+            --output /tmp/naive.jsonl
+      - name: Confirm naive baseline does not pass every scenario
+        run: |
+          if python benchmarks/v0.1/run_benchmark.py \
+            --responses /tmp/naive.jsonl \
+            --output /tmp/naive-report.json; then
+            echo "Naive baseline unexpectedly passed all scenarios"
+            exit 1
+          fi
+      - name: Generate safety-first validation responses
+        run: |
+          python benchmarks/v0.1/generate_baselines.py \
+            --policy safety-first \
+            --output /tmp/safety-first.jsonl
+      - name: Confirm safety-first policy satisfies deterministic rules
+        run: |
+          python benchmarks/v0.1/run_benchmark.py \
+            --responses /tmp/safety-first.jsonl \
+            --output /tmp/safety-first-report.json
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-validation-reports
+          path: /tmp/*-report.json
